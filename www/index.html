@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#07080d" />
+  <title>Block Blast — Liquid Glass</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Latar Belakang Aura Dinamis -->
+  <div class="aura-bg" aria-hidden="true">
+    <span class="aura-orb orb-1"></span>
+    <span class="aura-orb orb-2"></span>
+    <span class="aura-orb orb-3"></span>
+    <div id="combo-flash" class="combo-flash"></div>
+  </div>
+
+  <main id="app">
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="stat-pill liquid-glass" title="Skor Tertinggi">
+        <svg class="icon-gold" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3a1 1 0 01-1 1H6a1 1 0 01-1-1v-1h14v1z"/>
+        </svg>
+        <span id="high-score">0</span>
+      </div>
+
+      <div class="score-center">
+        <div id="current-score">0</div>
+        <div id="streak-badge" class="streak-badge">COMBO ×1</div>
+      </div>
+
+      <div class="top-actions">
+        <button id="btn-mute" class="icon-btn liquid-glass" type="button" title="Suara" aria-label="Suara">
+          <svg id="icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+          </svg>
+          <svg id="icon-sound-off" viewBox="0 0 24 24" aria-hidden="true" hidden>
+            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+          </svg>
+        </button>
+        <button id="btn-restart" class="icon-btn liquid-glass" type="button" title="Mulai Ulang" aria-label="Mulai Ulang">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5V2L8 6l4 4V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Papan 8x8 -->
+    <section id="board-shell" class="glass-panel">
+      <div id="bomb-banner" class="bomb-banner">Ketuk area papan untuk meledakkan 3×3</div>
+      <div id="board-grid" role="grid" aria-label="Papan Permainan 8 kali 8"></div>
+    </section>
+
+    <!-- 3 Slot Pilihan Balok -->
+    <section id="dock" class="glass-panel" aria-label="Pilihan Balok">
+      <div class="dock-slot" data-slot="0"></div>
+      <div class="dock-slot" data-slot="1"></div>
+      <div class="dock-slot" data-slot="2"></div>
+    </section>
+
+    <!-- Toolbar Bantuan (Undo, Refresh, Bom) -->
+    <nav class="powerup-bar" aria-label="Bantuan Permainan">
+      <button id="btn-undo" class="power-btn power-undo" type="button" title="Kembali ke langkah sebelumnya (Z)">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 14L4 9l5-5v3h5a6 6 0 010 12h-3v-2h3a4 4 0 000-8H9v5z"/>
+        </svg>
+        <span>Undo</span>
+        <em id="count-undo" class="badge">3</em>
+      </button>
+
+      <button id="btn-refresh" class="power-btn power-refresh" type="button" title="Acak ulang balok di bawah (R)">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+        <span>Refresh</span>
+        <em id="count-refresh" class="badge">3</em>
+      </button>
+
+      <button id="btn-bomb" class="power-btn power-bomb" type="button" title="Bom area 3x3 (B)">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M10.5 7.5A6.5 6.5 0 1017 14a6.47 6.47 0 00-1.45-4.1l1.6-1.6-1.42-1.42-1.6 1.6A6.47 6.47 0 0010.5 7.5zm6.8-3.4l1.1-1.9 1.1 1.9 1.9 1.1-1.9 1.1-1.1 1.9-1.1-1.9-1.9-1.1 1.9-1.1zM14 2h1.6v2H14V2zm5.5 6.4H21.5V10h-2V8.4z"/>
+        </svg>
+        <span>Bom</span>
+        <em id="count-bomb" class="badge">2</em>
+      </button>
+    </nav>
+  </main>
+
+  <!-- Layer Balok Melayang -->
+  <div id="drag-layer" aria-hidden="true">
+    <div id="drag-grid"></div>
+  </div>
+
+  <!-- Layer Efek Partikel, Shockwave & Teks -->
+  <canvas id="fx-canvas" aria-hidden="true"></canvas>
+  <div id="floating-texts" aria-hidden="true"></div>
+
+  <!-- Modal Game Over -->
+  <div id="gameover-modal" class="modal-backdrop" role="dialog" aria-modal="true" hidden>
+    <div class="modal-sheet">
+      <h2 class="modal-title">Permainan Selesai</h2>
+      <p class="modal-sub">Tidak ada ruang tersisa untuk balok aktif</p>
+
+      <div class="modal-stats">
+        <span class="modal-label">SKOR AKHIR</span>
+        <div id="final-score" class="modal-score">0</div>
+        <div class="modal-best">
+          <svg class="icon-gold" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3a1 1 0 01-1 1H6a1 1 0 01-1-1v-1h14v1z"/>
+          </svg>
+          <span id="final-best">0</span>
+          <span id="new-best-pill" class="new-pill" hidden>REKOR BARU</span>
+        </div>
+      </div>
+
+      <div class="modal-buttons">
+        <button id="btn-rescue" class="btn-secondary" type="button" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>
+          </svg>
+          <span>Gunakan Bantuan</span>
+        </button>
+        <button id="btn-play-again" class="btn-primary" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <span>Main Lagi</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
