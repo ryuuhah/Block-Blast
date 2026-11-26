@@ -16,8 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: "22"
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
@@ -26,7 +25,7 @@ jobs:
           java-version: "21"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Initialize Capacitor config
         run: npx cap init "Block Blast" "com.example.blockblast" --web-dir www
