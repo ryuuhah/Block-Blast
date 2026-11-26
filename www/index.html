@@ -1,25 +1,24 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="liquid">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#07080d" />
-  <title>Block Blast — Liquid Glass</title>
+  <title>Block Blast</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Latar Belakang Aura Dinamis -->
+  <!-- Latar Belakang Aura (Hanya aktif di tema Liquid Glass) -->
   <div class="aura-bg" aria-hidden="true">
     <span class="aura-orb orb-1"></span>
     <span class="aura-orb orb-2"></span>
-    <span class="aura-orb orb-3"></span>
     <div id="combo-flash" class="combo-flash"></div>
   </div>
 
   <main id="app">
     <!-- Top Bar -->
     <header class="top-bar">
-      <div class="stat-pill liquid-glass" title="Skor Tertinggi">
+      <div class="stat-pill panel-pill" title="Skor Tertinggi">
         <svg class="icon-gold" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3a1 1 0 01-1 1H6a1 1 0 01-1-1v-1h14v1z"/>
         </svg>
@@ -32,7 +31,12 @@
       </div>
 
       <div class="top-actions">
-        <button id="btn-mute" class="icon-btn liquid-glass" type="button" title="Suara" aria-label="Suara">
+        <button id="btn-theme" class="icon-btn panel-pill" type="button" title="Pilih Tema" aria-label="Pilih Tema">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3a9 9 0 000 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+          </svg>
+        </button>
+        <button id="btn-mute" class="icon-btn panel-pill" type="button" title="Suara" aria-label="Suara">
           <svg id="icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
           </svg>
@@ -40,7 +44,7 @@
             <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
           </svg>
         </button>
-        <button id="btn-restart" class="icon-btn liquid-glass" type="button" title="Mulai Ulang" aria-label="Mulai Ulang">
+        <button id="btn-restart" class="icon-btn panel-pill" type="button" title="Mulai Ulang" aria-label="Mulai Ulang">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 5V2L8 6l4 4V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
           </svg>
@@ -49,13 +53,13 @@
     </header>
 
     <!-- Papan 8x8 -->
-    <section id="board-shell" class="glass-panel">
+    <section id="board-shell" class="surface-panel">
       <div id="bomb-banner" class="bomb-banner">Ketuk area papan untuk meledakkan 3×3</div>
       <div id="board-grid" role="grid" aria-label="Papan Permainan 8 kali 8"></div>
     </section>
 
     <!-- 3 Slot Pilihan Balok -->
-    <section id="dock" class="glass-panel" aria-label="Pilihan Balok">
+    <section id="dock" class="surface-panel" aria-label="Pilihan Balok">
       <div class="dock-slot" data-slot="0"></div>
       <div class="dock-slot" data-slot="1"></div>
       <div class="dock-slot" data-slot="2"></div>
@@ -94,9 +98,78 @@
     <div id="drag-grid"></div>
   </div>
 
-  <!-- Layer Efek Partikel, Shockwave & Teks -->
+  <!-- Layer Efek Partikel & Teks -->
   <canvas id="fx-canvas" aria-hidden="true"></canvas>
   <div id="floating-texts" aria-hidden="true"></div>
+
+  <!-- Modal Pemilih Tema -->
+  <div id="theme-modal" class="modal-backdrop" role="dialog" aria-modal="true" hidden>
+    <div class="modal-sheet theme-sheet">
+      <div class="modal-header-row">
+        <div>
+          <h2 class="modal-title">Pilih Tema Tampilan</h2>
+          <p class="modal-sub">Urutan dari paling ringan hingga efek penuh</p>
+        </div>
+        <button id="btn-close-theme" class="icon-btn panel-pill" type="button" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="theme-list" class="theme-list">
+        <button class="theme-option" type="button" data-theme-val="lite">
+          <span class="theme-swatch swatch-lite"><i></i><i></i><i></i><i></i></span>
+          <span class="theme-info">
+            <strong>Ultra Ringan</strong>
+            <small>Tanpa blur & bayangan, maksimal 60 FPS</small>
+          </span>
+          <span class="theme-tag tag-fast">TERINGAN</span>
+        </button>
+
+        <button class="theme-option" type="button" data-theme-val="pixel">
+          <span class="theme-swatch swatch-pixel"><i></i><i></i><i></i><i></i></span>
+          <span class="theme-info">
+            <strong>Pixel Art 8-Bit</strong>
+            <small>Blok piksel retro tajam & partikel kotak</small>
+          </span>
+          <span class="theme-tag tag-retro">RETRO</span>
+        </button>
+
+        <button class="theme-option" type="button" data-theme-val="amoled">
+          <span class="theme-swatch swatch-amoled"><i></i><i></i><i></i><i></i></span>
+          <span class="theme-info">
+            <strong>AMOLED Neon</strong>
+            <small>Hitam pekat hemat baterai + garis neon</small>
+          </span>
+          <span class="theme-tag tag-oled">OLED</span>
+        </button>
+
+        <button class="theme-option" type="button" data-theme-val="wood">
+          <span class="theme-swatch swatch-wood"><i></i><i></i><i></i><i></i></span>
+          <span class="theme-info">
+            <strong>Kayu Klasik</strong>
+            <small>Nuansa papan kayu hangat & ringan</small>
+          </span>
+          <span class="theme-tag tag-warm">KLASIK</span>
+        </button>
+
+        <button class="theme-option" type="button" data-theme-val="liquid">
+          <span class="theme-swatch swatch-liquid"><i></i><i></i><i></i><i></i></span>
+          <span class="theme-info">
+            <strong>Liquid Glass</strong>
+            <small>Kaca transparan berkilau (dioptimasi)</small>
+          </span>
+          <span class="theme-tag tag-glass">PREMIUM</span>
+        </button>
+      </div>
+
+      <label class="fx-toggle-row">
+        <span>Kurangi partikel ledakan (Mode Hemat)</span>
+        <input id="toggle-low-fx" type="checkbox" />
+      </label>
+    </div>
+  </div>
 
   <!-- Modal Game Over -->
   <div id="gameover-modal" class="modal-backdrop" role="dialog" aria-modal="true" hidden>

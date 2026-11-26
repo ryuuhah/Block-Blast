@@ -3,7 +3,17 @@
 
   const GRID_SIZE = 8;
   const SAVE_KEY = 'bb_saved_session_v1';
-  const COLORS = ['#ff453a', '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff', '#0a84ff', '#bf5af2', '#ff375f'];
+  const THEME_KEY = 'bb_theme_v1';
+  const LOW_FX_KEY = 'bb_low_fx_v1';
+  const COLORS = ['#ff453a', '#ff9f0a', '#ffd60a', '#30d158', '#5ac8fa', '#0a84ff', '#bf5af2', '#ff375f'];
+
+  const THEME_META = {
+    lite:   { bg: '#11141d', pixelParticles: false },
+    pixel:  { bg: '#161426', pixelParticles: true },
+    amoled: { bg: '#000000', pixelParticles: false },
+    wood:   { bg: '#1b120c', pixelParticles: false },
+    liquid: { bg: '#06070c', pixelParticles: false }
+  };
 
   // 45 Variasi Bentuk Klasik + Bobot Ramah Pemain
   const SHAPES = [
@@ -35,6 +45,27 @@
   ].map(s => ({ ...s, cells: s.m.flat().reduce((a, b) => a + b, 0) }));
 
   /* =========================================================================
+     SISTEM TEMA & MODE HEMAT PERFORMA
+     ========================================================================= */
+  let currentTheme = localStorage.getItem(THEME_KEY) || 'liquid';
+  if (!THEME_META[currentTheme]) currentTheme = 'liquid';
+  let lowFxMode = localStorage.getItem(LOW_FX_KEY) === '1';
+
+  function applyTheme(themeName) {
+    if (!THEME_META[themeName]) themeName = 'liquid';
+    currentTheme = themeName;
+    document.documentElement.dataset.theme = themeName;
+    localStorage.setItem(THEME_KEY, themeName);
+
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', THEME_META[themeName].bg);
+
+    document.querySelectorAll('.theme-option').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.themeVal === themeName);
+    });
+  }
+
+  /* =========================================================================
      AUDIO ENGINE (WEB AUDIO API)
      ========================================================================= */
   const SFX = {
@@ -47,66 +78,67 @@
       }
       if (this.ctx?.state === 'suspended') this.ctx.resume();
     },
-    tone(freq, endFreq, dur, type = 'sine', vol = 0.14, delay = 0) {
+    tone(freq, endFreq, dur, type = 'sine', vol = 0.13, delay = 0) {
       if (this.muted) return;
       this.init();
       if (!this.ctx) return;
       const t = this.ctx.currentTime + delay;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-      osc.type = type;
+      osc.type = currentTheme === 'pixel' ? 'square' : type;
       osc.frequency.setValueAtTime(freq, t);
       if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, t + dur);
       gain.gain.setValueAtTime(0.001, t);
-      gain.gain.linearRampToValueAtTime(vol, t + 0.015);
+      gain.gain.linearRampToValueAtTime(vol, t + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start(t);
       osc.stop(t + dur + 0.02);
     },
-    pickup() { this.tone(360, 540, 0.07, 'sine', 0.1); },
-    place() { this.tone(210, 95, 0.085, 'triangle', 0.16); },
-    undo() { this.tone(480, 290, 0.1, 'sine', 0.12); },
+    pickup() { this.tone(360, 540, 0.06, 'sine', 0.09); },
+    place() { this.tone(210, 95, 0.08, 'triangle', 0.15); },
+    undo() { this.tone(480, 290, 0.09, 'sine', 0.11); },
     refresh() {
-      this.tone(420, 620, 0.07, 'sine', 0.1, 0);
-      this.tone(540, 760, 0.08, 'sine', 0.1, 0.06);
+      this.tone(420, 620, 0.06, 'sine', 0.09, 0);
+      this.tone(540, 760, 0.07, 'sine', 0.09, 0.05);
     },
     bomb() {
-      this.tone(150, 38, 0.32, 'sawtooth', 0.22, 0);
-      this.tone(95, 30, 0.36, 'triangle', 0.24, 0.02);
+      this.tone(150, 38, 0.28, 'sawtooth', 0.2, 0);
+      this.tone(95, 30, 0.32, 'triangle', 0.2, 0.02);
     },
     clear(combo) {
       const mult = Math.pow(2, Math.min(combo, 10) / 12);
       [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
-        this.tone(f * mult, f * mult * 1.03, 0.28, 'sine', 0.14, i * 0.036);
+        this.tone(f * mult, f * mult * 1.03, 0.24, 'sine', 0.13, i * 0.032);
       });
-      // Tambahan kilau harmonik tinggi saat combo >= 2
-      if (combo >= 2) {
-        this.tone(1318.5 * mult, 1567.98 * mult, 0.34, 'triangle', 0.09, 0.1);
-      }
     },
     over() {
       [392, 349.23, 329.63, 261.63].forEach((f, i) => {
-        this.tone(f, f * 0.96, 0.22, 'triangle', 0.1, i * 0.12);
+        this.tone(f, f * 0.96, 0.2, 'triangle', 0.09, i * 0.11);
       });
     }
   };
 
   /* =========================================================================
-     PARTICLE & SHOCKWAVE SYSTEM (60FPS)
+     PARTICLE SYSTEM RINGAN (TANPA SHADOWBLUR, CAPPED DPR & PARTICLE POOL)
      ========================================================================= */
   const FX = (() => {
     const canvas = document.getElementById('fx-canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
+    const MAX_PARTICLES = 85;
     let particles = [];
     let rings = [];
     let active = false;
+    let vw = window.innerWidth;
+    let vh = window.innerHeight;
 
     const resize = () => {
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
+      vw = window.innerWidth;
+      vh = window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+      canvas.width = Math.round(vw * dpr);
+      canvas.height = Math.round(vh * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     window.addEventListener('resize', resize);
@@ -120,86 +152,83 @@
     };
 
     const loop = () => {
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      ctx.clearRect(0, 0, vw, vh);
 
-      // Gambar gelombang kejut (shockwave rings) saat combo / multi-clear
       for (let i = rings.length - 1; i >= 0; i--) {
         const r = rings[i];
-        r.radius += (r.maxRadius - r.radius) * 0.14;
+        r.radius += (r.maxRadius - r.radius) * 0.16;
         r.alpha -= r.decay;
-        if (r.alpha <= 0.01) {
+        if (r.alpha <= 0.02) {
           rings.splice(i, 1);
           continue;
         }
-        ctx.save();
         ctx.globalAlpha = r.alpha;
         ctx.strokeStyle = r.color;
         ctx.lineWidth = r.lineWidth * r.alpha;
-        ctx.shadowColor = r.color;
-        ctx.shadowBlur = 16;
         ctx.beginPath();
         ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.restore();
       }
 
-      // Gambar partikel pecahan kaca cair
+      const isPixel = THEME_META[currentTheme]?.pixelParticles;
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.16;
-        p.vx *= 0.96;
+        p.vy += 0.18;
+        p.vx *= 0.95;
         p.a -= p.decay;
-        if (p.a <= 0) {
+        if (p.a <= 0.02) {
           particles.splice(i, 1);
           continue;
         }
-        ctx.save();
         ctx.globalAlpha = p.a;
         ctx.fillStyle = p.color;
-        if (p.glow) {
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 10;
+        const half = p.s * 0.5;
+        if (isPixel) {
+          ctx.fillRect((p.x - half) | 0, (p.y - half) | 0, p.s | 0, p.s | 0);
+        } else {
+          ctx.fillRect(p.x - half, p.y - half, p.s, p.s);
         }
-        ctx.beginPath();
-        ctx.roundRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s, p.s * 0.35);
-        ctx.fill();
-        ctx.restore();
       }
 
+      ctx.globalAlpha = 1;
       if (particles.length || rings.length) requestAnimationFrame(loop);
       else active = false;
     };
 
     return {
-      burst(x, y, color, count = 8, glow = false) {
-        for (let i = 0; i < count; i++) {
-          const ang = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45;
-          const spd = 2.2 + Math.random() * (glow ? 5.2 : 4.2);
+      burst(x, y, color, count = 6) {
+        const isLite = currentTheme === 'lite' || lowFxMode;
+        const actualCount = isLite ? Math.max(2, Math.ceil(count * 0.35)) : count;
+        const available = MAX_PARTICLES - particles.length;
+        const spawnCount = Math.min(actualCount, Math.max(0, available));
+
+        for (let i = 0; i < spawnCount; i++) {
+          const ang = (Math.PI * 2 * i) / spawnCount + (Math.random() - 0.5) * 0.5;
+          const spd = 2 + Math.random() * 3.8;
           particles.push({
             x, y,
             vx: Math.cos(ang) * spd,
-            vy: Math.sin(ang) * spd - 1.3,
-            s: (glow ? 4.8 : 4) + Math.random() * 3.5,
+            vy: Math.sin(ang) * spd - 1.2,
+            s: currentTheme === 'pixel' ? 6 : 4 + Math.random() * 3,
             color,
-            glow,
-            a: 0.96,
-            decay: 0.024 + Math.random() * 0.015
+            a: 0.95,
+            decay: isLite ? 0.038 : 0.028 + Math.random() * 0.015
           });
         }
-        startLoop();
+        if (spawnCount > 0) startLoop();
       },
-      shockwave(x, y, color = '#ffd60a', maxRadius = 190) {
+      shockwave(x, y, color = '#ffd60a', maxRadius = 175) {
+        if (currentTheme === 'lite' || lowFxMode) return;
         rings.push({
-          x,
-          y,
+          x, y,
           radius: 14,
           maxRadius,
           color,
-          lineWidth: 5,
-          alpha: 0.9,
-          decay: 0.032
+          lineWidth: 4,
+          alpha: 0.85,
+          decay: 0.038
         });
         startLoop();
       }
@@ -207,7 +236,7 @@
   })();
 
   /* =========================================================================
-     DOM REFERENCES & GAME STATE
+     DOM REFERENCES, CACHED METRICS & GAME STATE
      ========================================================================= */
   const $ = id => document.getElementById(id);
   const el = {
@@ -222,6 +251,8 @@
     comboFlash: $('combo-flash'),
     floats: $('floating-texts'),
     modal: $('gameover-modal'),
+    themeModal: $('theme-modal'),
+    toggleLowFx: $('toggle-low-fx'),
     btnUndo: $('btn-undo'),
     btnRefresh: $('btn-refresh'),
     btnBomb: $('btn-bomb'),
@@ -231,8 +262,18 @@
     cntBomb: $('count-bomb')
   };
 
+  // Cache ukuran & posisi papan agar nol DOM reflow saat drag di HP
+  const metrics = {
+    cell: 40,
+    gap: 4,
+    pitch: 44,
+    boardLeft: 0,
+    boardTop: 0
+  };
+
   let board = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
   let cellNodes = [];
+  let cellClassCache = Array(GRID_SIZE * GRID_SIZE).fill('');
   let dockPieces = [null, null, null];
   let historyStack = [];
 
@@ -261,7 +302,7 @@
   };
 
   /* =========================================================================
-     PERSISTENCE (AUTO-SAVE & RESUME KETIKA BROWSER DITUTUP)
+     AUTO-SAVE & LOAD SESSION
      ========================================================================= */
   function saveGameState() {
     try {
@@ -278,9 +319,7 @@
         isGameOver
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-    } catch (_) {
-      // Abaikan jika storage penuh / mode privat ketat
-    }
+    } catch (_) {}
   }
 
   function loadGameState() {
@@ -337,11 +376,8 @@
       refreshDockState();
       updatePowerupUI();
 
-      if (isGameOver) {
-        showGameOverModal(true);
-      } else {
-        checkGameOver();
-      }
+      if (isGameOver) showGameOverModal(true);
+      else checkGameOver();
       return true;
     } catch (_) {
       return false;
@@ -349,24 +385,36 @@
   }
 
   /* =========================================================================
-     RESPONSIVE LAYOUT & INITIALIZATION
+     SIZING & INITIALIZATION
      ========================================================================= */
+  function refreshBoardRect() {
+    const rect = el.boardGrid.getBoundingClientRect();
+    metrics.boardLeft = rect.left;
+    metrics.boardTop = rect.top;
+  }
+
   function updateSizing() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const maxH = vh - 295;
-    const maxW = Math.min(vw - 36, 408);
+    const maxH = vh - 275;
+    const maxW = Math.min(vw - 32, 408);
     const size = Math.max(220, Math.min(maxW, maxH));
     const gap = size < 290 ? 3 : 4;
-    const cell = Math.floor((size - 20 - gap * 7) / 8);
+    const cell = Math.floor((size - 18 - gap * 7) / 8);
+
+    metrics.cell = cell;
+    metrics.gap = gap;
+    metrics.pitch = cell + gap;
 
     document.documentElement.style.setProperty('--cell-size', `${cell}px`);
     document.documentElement.style.setProperty('--cell-gap', `${gap}px`);
+    requestAnimationFrame(refreshBoardRect);
   }
 
   function initGrid() {
     el.boardGrid.innerHTML = '';
     cellNodes = [];
+    cellClassCache.fill('');
     for (let r = 0; r < GRID_SIZE; r++) {
       const row = [];
       for (let c = 0; c < GRID_SIZE; c++) {
@@ -378,6 +426,14 @@
         row.push(div);
       }
       cellNodes.push(row);
+    }
+  }
+
+  function setCellClass(r, c, cls) {
+    const idx = r * GRID_SIZE + c;
+    if (cellClassCache[idx] !== cls) {
+      cellClassCache[idx] = cls;
+      cellNodes[r][c].className = cls;
     }
   }
 
@@ -415,11 +471,10 @@
         const br = sr + r;
         const bc = sc + c;
         next[br][bc] = 1;
-        for (const [nr, nc] of [[br - 1, bc], [br + 1, bc], [br, bc - 1], [br, bc + 1]]) {
-          if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE || simBoard[nr][nc] !== null) {
-            touches++;
-          }
-        }
+        if (br === 0 || simBoard[br - 1][bc] !== null) touches++;
+        if (br === GRID_SIZE - 1 || simBoard[br + 1][bc] !== null) touches++;
+        if (bc === 0 || simBoard[br][bc - 1] !== null) touches++;
+        if (bc === GRID_SIZE - 1 || simBoard[br][bc + 1] !== null) touches++;
       }
     }
 
@@ -439,7 +494,10 @@
     const result = [];
 
     for (let step = 0; step < count; step++) {
-      const occupied = sim.flat().filter(v => v !== null).length;
+      let occupied = 0;
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) if (sim[r][c] !== null) occupied++;
+      }
       const fillRatio = occupied / 64;
       const candidates = [];
 
@@ -570,7 +628,9 @@
     for (let r = centerR - 1; r <= centerR + 1; r++) {
       for (let c = centerC - 1; c <= centerC + 1; c++) {
         if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
-          cellNodes[r][c].classList.add('bomb-target');
+          const val = board[r][c];
+          const base = val === null ? 'cell' : `cell block-tile color-${val}`;
+          setCellClass(r, c, `${base} bomb-target`);
         }
       }
     }
@@ -582,6 +642,8 @@
     powerups.bomb--;
     setBombMode(false);
 
+    refreshBoardRect();
+    const { pitch, cell } = metrics;
     let destroyed = 0;
     let sumX = 0;
     let sumY = 0;
@@ -590,18 +652,17 @@
       for (let c = centerC - 1; c <= centerC + 1; c++) {
         if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
         const val = board[r][c];
-        const rect = cellNodes[r][c].getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
+        const cx = metrics.boardLeft + c * pitch + cell * 0.5;
+        const cy = metrics.boardTop + r * pitch + cell * 0.5;
 
         if (val !== null) {
-          FX.burst(cx, cy, COLORS[val], 11, true);
+          FX.burst(cx, cy, COLORS[val], 8);
           board[r][c] = null;
           destroyed++;
           sumX += cx;
           sumY += cy;
         } else if (r === centerR && c === centerC) {
-          FX.burst(cx, cy, '#ff453a', 9, true);
+          FX.burst(cx, cy, '#ff453a', 6);
           sumX += cx;
           sumY += cy;
         }
@@ -616,7 +677,7 @@
       const pts = destroyed * 15;
       const midX = sumX / destroyed;
       const midY = sumY / destroyed;
-      FX.shockwave(midX, midY, '#ff453a', 175);
+      FX.shockwave(midX, midY, '#ff453a', 165);
       addScore(pts);
       spawnCallout(midX, midY, 0, 0, pts, 'BOOM!');
     }
@@ -638,24 +699,19 @@
   }
 
   /* =========================================================================
-     RENDERING & INTERAKSI DRAG / BOMB
+     RENDERING & FAST GHOST PREVIEW (ZERO CLONING)
      ========================================================================= */
   function renderBoard() {
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
         const val = board[r][c];
-        cellNodes[r][c].className = val === null ? 'cell' : `cell block-tile color-${val}`;
+        setCellClass(r, c, val === null ? 'cell' : `cell block-tile color-${val}`);
       }
     }
   }
 
   function clearHighlights() {
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let c = 0; c < GRID_SIZE; c++) {
-        const val = board[r][c];
-        cellNodes[r][c].className = val === null ? 'cell' : `cell block-tile color-${val}`;
-      }
-    }
+    renderBoard();
   }
 
   function updateGhostPreview(row, col) {
@@ -666,33 +722,49 @@
     if (row === null || col === null || !drag.piece) return;
 
     const { m, color } = drag.piece;
+    const pRows = m.length;
+    const pCols = m[0].length;
     if (!canPlace(m, row, col)) return;
 
-    const temp = board.map(r => [...r]);
-    for (let r = 0; r < m.length; r++) {
-      for (let c = 0; c < m[0].length; c++) {
-        if (m[r][c]) {
-          temp[row + r][col + c] = color;
-          cellNodes[row + r][col + c].classList.add('block-tile', `color-${color}`, 'ghost');
-        }
+    const fullRows = new Uint8Array(GRID_SIZE);
+    const fullCols = new Uint8Array(GRID_SIZE);
+
+    for (let r = row; r < row + pRows; r++) {
+      let full = true;
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const covered = c >= col && c < col + pCols && m[r - row][c - col] === 1;
+        if (board[r][c] === null && !covered) { full = false; break; }
       }
+      if (full) fullRows[r] = 1;
+    }
+
+    for (let c = col; c < col + pCols; c++) {
+      let full = true;
+      for (let r = 0; r < GRID_SIZE; r++) {
+        const covered = r >= row && r < row + pRows && m[r - row][c - col] === 1;
+        if (board[r][c] === null && !covered) { full = false; break; }
+      }
+      if (full) fullCols[c] = 1;
     }
 
     for (let r = 0; r < GRID_SIZE; r++) {
-      if (temp[r].every(v => v !== null)) {
-        for (let c = 0; c < GRID_SIZE; c++) cellNodes[r][c].classList.add('will-clear');
-      }
-    }
-    for (let c = 0; c < GRID_SIZE; c++) {
-      if (temp.every(rowArr => rowArr[c] !== null)) {
-        for (let r = 0; r < GRID_SIZE; r++) cellNodes[r][c].classList.add('will-clear');
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const isGhost = r >= row && r < row + pRows && c >= col && c < col + pCols && m[r - row][c - col] === 1;
+        const willClear = fullRows[r] === 1 || fullCols[c] === 1;
+        if (!isGhost && !willClear) continue;
+
+        if (isGhost) {
+          setCellClass(r, c, `cell block-tile color-${color} ghost${willClear ? ' will-clear' : ''}`);
+        } else {
+          const val = board[r][c];
+          setCellClass(r, c, `cell block-tile color-${val} will-clear`);
+        }
       }
     }
   }
 
   function renderDock(animate = false) {
-    const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 40;
-    const mini = Math.max(14, Math.floor(cell * 0.5));
+    const mini = Math.max(14, Math.floor(metrics.cell * 0.5));
 
     el.dockSlots.forEach((slot, idx) => {
       slot.innerHTML = '';
@@ -751,10 +823,9 @@
 
     e.preventDefault();
     SFX.init();
+    refreshBoardRect();
 
-    const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
-    const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-gap'));
-
+    const { cell, gap } = metrics;
     el.dragGrid.innerHTML = '';
     el.dragGrid.style.gridTemplateColumns = `repeat(${piece.m[0].length}, ${cell}px)`;
     el.dragGrid.style.gridTemplateRows = `repeat(${piece.m.length}, ${cell}px)`;
@@ -790,18 +861,17 @@
     if (!drag.active) return;
     e.preventDefault();
 
-    const offsetY = drag.isTouch ? drag.h + 46 : drag.h / 2;
-    const left = e.clientX - drag.w / 2;
+    const offsetY = drag.isTouch ? drag.h + 44 : drag.h * 0.5;
+    const left = e.clientX - drag.w * 0.5;
     const top = e.clientY - offsetY;
 
     el.dragLayer.style.transform = `translate3d(${left}px, ${top}px, 0)`;
 
-    const rect = el.boardGrid.getBoundingClientRect();
-    const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
-    const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell-gap'));
-    const pitch = cell + gap;
-
-    const snap = findSnapCell(drag.piece.m, (top - rect.top) / pitch, (left - rect.left) / pitch);
+    const snap = findSnapCell(
+      drag.piece.m,
+      (top - metrics.boardTop) / metrics.pitch,
+      (left - metrics.boardLeft) / metrics.pitch
+    );
     updateGhostPreview(snap ? snap.r : null, snap ? snap.c : null);
   }
 
@@ -827,21 +897,13 @@
      PENEMPATAN BALOK, LINE CLEAR, EFEK COMBO & SKOR
      ========================================================================= */
   function triggerComboEffects(centerX, centerY, lines, combo, accentColor) {
-    // 1. Gelombang kejut (shockwave) bercahaya pada canvas efek
-    const waveColor = combo >= 3 ? '#ffd60a' : (combo >= 2 ? '#64d2ff' : accentColor);
-    FX.shockwave(centerX, centerY, waveColor, 150 + Math.min(combo, 5) * 35);
+    const waveColor = combo >= 3 ? '#ffd60a' : (combo >= 2 ? '#5ac8fa' : accentColor);
+    FX.shockwave(centerX, centerY, waveColor, 150 + Math.min(combo, 4) * 30);
 
-    if (combo >= 2 || lines >= 2) {
-      FX.shockwave(centerX, centerY, '#ffffff', 110 + lines * 25);
-
-      // 2. Kilatan aura layar penuh & denyut cahaya papan
+    if (currentTheme === 'liquid' && (combo >= 2 || lines >= 2)) {
       el.comboFlash.classList.remove('trigger');
       void el.comboFlash.offsetWidth;
       el.comboFlash.classList.add('trigger');
-
-      el.boardShell.classList.remove('combo-surge');
-      void el.boardShell.offsetWidth;
-      el.boardShell.classList.add('combo-surge');
     }
   }
 
@@ -862,9 +924,11 @@
     el.dockSlots[slotIdx].innerHTML = '';
     renderBoard();
 
-    for (let r = 0; r < piece.m.length; r++) {
-      for (let c = 0; c < piece.m[0].length; c++) {
-        if (piece.m[r][c]) cellNodes[sr + r][sc + c].classList.add('placed-pop');
+    if (currentTheme !== 'lite') {
+      for (let r = 0; r < piece.m.length; r++) {
+        for (let c = 0; c < piece.m[0].length; c++) {
+          if (piece.m[r][c]) cellNodes[sr + r][sc + c].classList.add('placed-pop');
+        }
       }
     }
 
@@ -880,20 +944,21 @@
     if (lines > 0) {
       turnsNoClear = 0;
       comboStreak++;
+      refreshBoardRect();
 
       const clearedSet = new Set();
-      fullR.forEach(r => { for (let c = 0; c < GRID_SIZE; c++) clearedSet.add(`${r},${c}`); });
-      fullC.forEach(c => { for (let r = 0; r < GRID_SIZE; r++) clearedSet.add(`${r},${c}`); });
+      fullR.forEach(r => { for (let c = 0; c < GRID_SIZE; c++) clearedSet.add(r * GRID_SIZE + c); });
+      fullC.forEach(c => { for (let r = 0; r < GRID_SIZE; r++) clearedSet.add(r * GRID_SIZE + c); });
 
-      const isHighCombo = comboStreak >= 2 || lines >= 2;
+      const { pitch, cell } = metrics;
       let sx = 0, sy = 0, n = 0;
-      clearedSet.forEach(k => {
-        const [r, c] = k.split(',').map(Number);
-        const rect = cellNodes[r][c].getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
+      clearedSet.forEach(idx => {
+        const r = (idx / GRID_SIZE) | 0;
+        const c = idx % GRID_SIZE;
+        const cx = metrics.boardLeft + c * pitch + cell * 0.5;
+        const cy = metrics.boardTop + r * pitch + cell * 0.5;
         sx += cx; sy += cy; n++;
-        FX.burst(cx, cy, COLORS[board[r][c] ?? piece.color], isHighCombo ? 12 : 8, isHighCombo);
+        FX.burst(cx, cy, COLORS[board[r][c] ?? piece.color], 6);
         board[r][c] = null;
       });
 
@@ -914,7 +979,7 @@
       if (turnsNoClear >= 4) comboStreak = 0;
     }
 
-    updateStreakUI(lines > 0 && comboStreak >= 2);
+    updateStreakUI();
     addScore(points);
 
     if (dockPieces.every(p => p === null)) {
@@ -929,6 +994,7 @@
   }
 
   function shakeBoard() {
+    if (currentTheme === 'lite') return;
     el.boardShell.classList.remove('shake');
     void el.boardShell.offsetWidth;
     el.boardShell.classList.add('shake');
@@ -941,20 +1007,19 @@
     const div = document.createElement('div');
     div.className = 'float-callout';
     div.style.left = `${Math.max(85, Math.min(window.innerWidth - 85, x))}px`;
-    div.style.top = `${Math.max(100, Math.min(window.innerHeight - 150, y))}px`;
+    div.style.top = `${Math.max(95, Math.min(window.innerHeight - 140, y))}px`;
     div.innerHTML =
       (word ? `<div class="float-word">${word}</div>` : '') +
       (combo >= 2 ? `<div class="float-combo">COMBO ×${combo}</div>` : '') +
       `<div class="float-points">+${points}</div>`;
 
     el.floats.appendChild(div);
-    setTimeout(() => div.remove(), 900);
+    setTimeout(() => div.remove(), 850);
   }
 
   function addScore(amount) {
     score += amount;
 
-    // Hadiah +1 bantuan setiap kelipatan 1.000 poin
     while (score >= nextMilestone) {
       nextMilestone += 1000;
       const keys = ['undo', 'refresh', 'bomb'];
@@ -962,7 +1027,7 @@
       if (powerups[keys[0]] < 5) {
         powerups[keys[0]]++;
         const names = { undo: '+1 Undo', refresh: '+1 Refresh', bomb: '+1 Bom' };
-        spawnCallout(window.innerWidth / 2, 120, 0, 0, 0, names[keys[0]]);
+        spawnCallout(window.innerWidth / 2, 115, 0, 0, 0, names[keys[0]]);
       }
     }
 
@@ -973,7 +1038,7 @@
     }
 
     el.score.classList.add('pulse');
-    setTimeout(() => el.score.classList.remove('pulse'), 160);
+    setTimeout(() => el.score.classList.remove('pulse'), 150);
 
     if (scoreAnimId) cancelAnimationFrame(scoreAnimId);
     const step = () => {
@@ -984,27 +1049,19 @@
         scoreAnimId = null;
         return;
       }
-      shownScore += Math.max(1, Math.ceil(diff * 0.25));
+      shownScore += Math.max(1, Math.ceil(diff * 0.28));
       el.score.textContent = shownScore.toLocaleString('id-ID');
       scoreAnimId = requestAnimationFrame(step);
     };
     scoreAnimId = requestAnimationFrame(step);
   }
 
-  function updateStreakUI(justIncremented = false) {
+  function updateStreakUI() {
     const active = comboStreak >= 2;
     el.streak.textContent = comboStreak >= 4 ? `FEVER ×${comboStreak}` : `COMBO ×${comboStreak}`;
     el.streak.classList.toggle('active', active);
     el.boardShell.classList.toggle('combo-glow', active);
-
     document.body.classList.toggle('has-combo', active);
-    document.body.classList.toggle('combo-high', comboStreak >= 4);
-
-    if (justIncremented && active) {
-      el.streak.classList.remove('pop');
-      void el.streak.offsetWidth;
-      el.streak.classList.add('pop');
-    }
   }
 
   /* =========================================================================
@@ -1025,7 +1082,7 @@
     };
 
     if (immediate) present();
-    else setTimeout(present, 360);
+    else setTimeout(present, 320);
   }
 
   function checkGameOver() {
@@ -1068,7 +1125,7 @@
   }
 
   /* =========================================================================
-     EVENT DELEGATION & KEYBOARD SHORTCUTS (DESKTOP & MOBILE)
+     EVENT LISTENERS & PEMILIH TEMA
      ========================================================================= */
   el.dockSlots.forEach((slot, idx) => {
     slot.addEventListener('pointerdown', e => startPieceDrag(e, idx));
@@ -1079,13 +1136,11 @@
   window.addEventListener('pointercancel', endPieceDrag);
   window.addEventListener('blur', endPieceDrag);
 
-  // Simpan otomatis saat aplikasi pindah latar belakang / ditutup
   window.addEventListener('pagehide', saveGameState);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') saveGameState();
   });
 
-  // Interaksi Bom pada Papan 8x8 (Hover Preview & Tap Detonate)
   el.boardGrid.addEventListener('pointermove', e => {
     if (!bombMode) return;
     const cell = e.target.closest('.cell');
@@ -1101,6 +1156,35 @@
     if (!bombMode) return;
     const cell = e.target.closest('.cell');
     if (cell) detonateBomb(Number(cell.dataset.r), Number(cell.dataset.c));
+  });
+
+  // Modal Tema
+  $('btn-theme').addEventListener('click', () => {
+    SFX.pickup();
+    el.themeModal.hidden = false;
+  });
+
+  $('btn-close-theme').addEventListener('click', () => {
+    el.themeModal.hidden = true;
+  });
+
+  el.themeModal.addEventListener('pointerdown', e => {
+    if (e.target === el.themeModal) el.themeModal.hidden = true;
+  });
+
+  document.querySelectorAll('.theme-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      SFX.pickup();
+      applyTheme(btn.dataset.themeVal);
+      renderBoard();
+      renderDock(false);
+    });
+  });
+
+  el.toggleLowFx.checked = lowFxMode;
+  el.toggleLowFx.addEventListener('change', () => {
+    lowFxMode = el.toggleLowFx.checked;
+    localStorage.setItem(LOW_FX_KEY, lowFxMode ? '1' : '0');
   });
 
   // Tombol Kontrol & Power-Ups
@@ -1127,13 +1211,16 @@
     $('icon-sound-off').hidden = !SFX.muted;
   });
 
-  // Shortcut Keyboard untuk Desktop
   window.addEventListener('keydown', e => {
     const key = e.key.toLowerCase();
     if (key === 'z') applyUndo();
     else if (key === 'r') applyRefresh();
     else if (key === 'b') setBombMode(!bombMode);
-    else if (key === 'escape' && bombMode) setBombMode(false);
+    else if (key === 't') el.themeModal.hidden = !el.themeModal.hidden;
+    else if (key === 'escape') {
+      if (!el.themeModal.hidden) el.themeModal.hidden = true;
+      else if (bombMode) setBombMode(false);
+    }
   });
 
   window.addEventListener('resize', () => {
@@ -1141,7 +1228,8 @@
     renderDock(false);
   });
 
-  // Start & Pulihkan Sesi Terakhir Jika Ada
+  // Inisialisasi
+  applyTheme(currentTheme);
   $('icon-sound-on').hidden = SFX.muted;
   $('icon-sound-off').hidden = !SFX.muted;
   updateSizing();
